@@ -1,0 +1,314 @@
+*&---------------------------------------------------------------------*
+*& Module Pool      ZSCREEN_PRACTICE1
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+PROGRAM ZSCREEN_PRACTICE1.
+
+***&SPWIZARD: DATA DECLARATION FOR TABLECONTROL 'PCONTROL'
+*&SPWIZARD: DEFINITION OF DDIC-TABLE
+TABLES:   ZSCREEN_PRACTICE.
+
+*&SPWIZARD: TYPE FOR THE DATA OF TABLECONTROL 'PCONTROL'
+TYPES: BEGIN OF T_PCONTROL,
+         MATERIAL_NUMBER LIKE ZSCREEN_PRACTICE-MATERIAL_NUMBER,
+         MATERIAL_DESCRIPTION LIKE ZSCREEN_PRACTICE-MATERIAL_DESCRIPTION,
+         QUANTITY LIKE ZSCREEN_PRACTICE-QUANTITY,
+         SHIFT_INDICATOR LIKE ZSCREEN_PRACTICE-SHIFT_INDICATOR,
+         CREATION_DATE LIKE ZSCREEN_PRACTICE-CREATION_DATE,
+         USER_NAME LIKE ZSCREEN_PRACTICE-USER_NAME,
+         DELETION_INDICATOR LIKE ZSCREEN_PRACTICE-DELETION_INDICATOR,
+       END OF T_PCONTROL.
+
+*&SPWIZARD: INTERNAL TABLE FOR TABLECONTROL 'PCONTROL'
+DATA:     G_PCONTROL_ITAB   TYPE T_PCONTROL OCCURS 0,
+          G_PCONTROL_WA     TYPE T_PCONTROL. "work area
+DATA:     G_PCONTROL_COPIED.           "copy flag
+
+*&SPWIZARD: DECLARATION OF TABLECONTROL 'PCONTROL' ITSELF
+CONTROLS: PCONTROL TYPE TABLEVIEW USING SCREEN 0100.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'PCONTROL'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: COPY DDIC-TABLE TO ITAB
+MODULE PCONTROL_INIT OUTPUT.
+  IF G_PCONTROL_COPIED IS INITIAL.
+*&SPWIZARD: COPY DDIC-TABLE 'ZSCREEN_PRACTICE'
+*&SPWIZARD: INTO INTERNAL TABLE 'g_PCONTROL_itab'
+*    SELECT * FROM ZSCREEN_PRACTICE
+*       INTO CORRESPONDING FIELDS
+*       OF TABLE G_PCONTROL_ITAB.
+    G_PCONTROL_COPIED = 'X'.
+    REFRESH CONTROL 'PCONTROL' FROM SCREEN '0100'.
+  ENDIF.
+ENDMODULE.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'PCONTROL'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MOVE ITAB TO DYNPRO
+MODULE PCONTROL_MOVE OUTPUT.
+  MOVE-CORRESPONDING G_PCONTROL_WA TO ZSCREEN_PRACTICE.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'PCONTROL'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MODIFY TABLE
+MODULE PCONTROL_MODIFY INPUT.
+  MOVE-CORRESPONDING ZSCREEN_PRACTICE TO G_PCONTROL_WA.
+  MODIFY G_PCONTROL_ITAB
+    FROM G_PCONTROL_WA
+    INDEX PCONTROL-CURRENT_LINE.
+ENDMODULE.
+
+
+
+"---------------------------------------------My Modifications-------------------------------------------------------------------"
+
+DATA : gv_edit TYPE CHAR1 VALUE 'F',
+       GV_DELETE TYPE CHAR1 VALUE 'F'.
+
+
+
+MODULE STATUS_0100 OUTPUT.
+  SET PF-STATUS 'ZSCREEN_PRAC_STATUS'.
+  if gv_edit = 'F'.
+    LOOP AT SCREEN.
+              if  screen-NAME CS 'ZSCREEN_PRACTICE-'.
+                "screen-NAME <> 'ZSCREEN_PRACTICE-MATERIAL_DESCRIPTION' AND
+                "MESSAGE 'FOUND IT' TYPE 'I'.
+                screen-input = 0.
+                MODIFY SCREEN.
+              ENDIF.
+    ENDLOOP.
+
+    ELSE.
+      LOOP AT SCREEN.
+              if  screen-NAME CS 'ZSCREEN_PRACTICE-MATERIAL_DESCRIPTION'.
+                "screen-NAME <> 'ZSCREEN_PRACTICE-MATERIAL_DESCRIPTION' AND
+                "MESSAGE 'FOUND IT' TYPE 'I'.
+                screen-input = 0.
+                MODIFY SCREEN.
+              ENDIF.
+    ENDLOOP.
+    "gv_edit = 'F'.
+  ENDIF.
+
+ENDMODULE.
+
+
+MODULE STATUS_0200 OUTPUT.
+  SET PF-STATUS 'ZSCREEN_PRAC_STATUS1'.
+
+ENDMODULE.
+
+ MODULE FILL_LISTBOX OUTPUT.
+    DATA : lt_value TYPE vrm_values,
+           ls_value TYPE vrm_value.
+    IF lt_value is INITIAL.
+    ls_value-KEY  = 'M'.
+    ls_value-TEXT = 'Morning'.
+    APPEND ls_value TO lt_value.
+
+    ls_value-KEY  = 'A'.
+    ls_value-TEXT = 'Afternoon'.
+    APPEND ls_value TO lt_value.
+
+    ls_value-KEY  = 'E'.
+    ls_value-TEXT = 'Evening'.
+    APPEND ls_value TO lt_value.
+
+    CALL FUNCTION 'VRM_SET_VALUES'
+      EXPORTING
+        ID                    = 'ZSCREEN_PRACTICE-SHIFT_INDICATOR'
+        VALUES                = lt_value
+              .
+    IF SY-SUBRC <> 0.
+
+    ENDIF.
+
+    ENDIF.
+
+
+  ENDMODULE.
+
+
+DATA : CONTAINER_NUMBER TYPE CHAR2,
+       DITEMS_CB TYPE c LENGTH 1.
+
+
+
+MODULE USER_COMMAND_0100.
+
+
+  CASE SY-UCOMM.
+
+    WHEN ' '.
+      CLEAR G_PCONTROL_ITAB.
+      IF  CONTAINER_NUMBER IS NOT INITIAL.
+        "MESSAGE |You entered: { CONTAINER_NUMBER }| TYPE 'I'.
+        if DITEMS_CB = 'X'.
+
+          SELECT SINGLE MATERIAL_NUMBER,MATERIAL_DESCRIPTION ,QUANTITY, SHIFT_INDICATOR, CREATION_DATE, USER_NAME, DELETION_INDICATOR
+          into  @G_PCONTROL_WA
+          FROM ZSCREEN_PRACTICE
+          WHERE CONTAINER_NUMBER = @CONTAINER_NUMBER.
+
+        ELSE.
+
+          SELECT SINGLE MATERIAL_NUMBER,MATERIAL_DESCRIPTION ,QUANTITY, SHIFT_INDICATOR, CREATION_DATE, USER_NAME, DELETION_INDICATOR
+          into  @G_PCONTROL_WA
+          FROM ZSCREEN_PRACTICE
+          WHERE CONTAINER_NUMBER = @CONTAINER_NUMBER
+          AND  DELETION_INDICATOR = @DITEMS_CB.
+
+        ENDIF.
+
+
+          if sy-SUBRC <> 0.
+            CALL SCREEN 0200 STARTING AT 10 5 ENDING AT 90 15.
+          ELSE.
+            "MESSAGE | { G_PCONTROL_WA-QUANTITY } | TYPE 'I'.
+            APPEND G_PCONTROL_WA TO G_PCONTROL_ITAB.
+            gv_edit = 'F'.
+
+
+          ENDIF.
+
+      ENDIF.
+
+    WHEN 'SAVE'.
+
+
+
+      IF CONTAINER_NUMBER IS INITIAL.
+         MESSAGE 'Please Enter A Container Number' TYPE 'I'.
+
+      ELSEIF gv_edit = 'T'.
+        READ TABLE G_PCONTROL_ITAB INTO G_PCONTROL_WA INDEX PCONTROL-CURRENT_LINE.
+      "MESSAGE |Quantity : { G_PCONTROL_WA-QUANTITY }| TYPE 'I'.
+
+
+      IF  G_PCONTROL_WA-MATERIAL_NUMBER IS INITIAL
+       OR G_PCONTROL_WA-CREATION_DATE IS INITIAL
+       OR G_PCONTROL_WA-QUANTITY IS INITIAL
+       OR G_PCONTROL_WA-SHIFT_INDICATOR IS INITIAL.
+       "OR G_PCONTROL_WA-DELETION_INDICATOR IS INITIAL
+       "OR G_PCONTROL_WA-USER_NAME IS INITIAL.
+
+        MESSAGE 'Please fill all the fields' TYPE 'I'.
+        gv_edit = 'T'.
+
+      ELSE.
+        DATA WA_TMP TYPE ZSCREEN_PRACTICE.
+        "DATA MD_TMP TYPE ZSCREEN_PRACTICE-MATERIAL_DESCRIPTION.
+        MOVE-CORRESPONDING G_PCONTROL_WA TO WA_TMP.
+        WA_TMP-CONTAINER_NUMBER = CONTAINER_NUMBER.
+
+
+        DATA: lv_matnr TYPE matnr.
+        lv_matnr = G_PCONTROL_WA-material_number.
+
+*        READ TABLE G_PCONTROL_ITAB WITH KEY MATERIAL_NUMBER = G_PCONTROL_WA-MATERIAL_NUMBER
+*                            TRANSPORTING NO FIELDS.
+
+        SELECT SINGLE material_number
+        FROM zscreen_practice
+        WHERE material_number  = @g_pcontrol_wa-material_number
+        INTO @DATA(lv_exists).
+
+        if sy-SUBRC = 0 AND G_PCONTROL_ITAB IS INITIAL.
+          MESSAGE 'This material number already exists' TYPE 'I'.
+        ELSE.
+          SELECT SINGLE m~maktx
+        FROM makt AS m
+        INNER JOIN mara AS m2
+        ON m~MATNR = m2~MATNR
+        WHERE m2~MATNR = @lv_matnr
+        INTO @DATA(md_tmp).
+
+        IF sy-subrc = 0.
+
+          "MESSAGE md_tmp TYPE 'I'.
+          WA_TMP-MATERIAL_DESCRIPTION = md_tmp.
+          WA_TMP-USER_NAME = sy-UNAME.
+          WA_TMP-CREATION_DATE = sy-DATUM.
+
+
+          G_PCONTROL_WA-CREATION_DATE = sy-DATUM.
+          G_PCONTROL_WA-USER_NAME = sy-UNAME.
+          "G_PCONTROL_WA-DELETION_INDICATOR = .
+          G_PCONTROL_WA-MATERIAL_DESCRIPTION = md_tmp.
+          "G_PCONTROL_WA-MATERIAL_NUMBER
+          "G_PCONTROL_WA-QUANTITY
+          "G_PCONTROL_WA-SHIFT_INDICATOR
+
+
+          if G_PCONTROL_ITAB is INITIAL.
+            APPEND G_PCONTROL_WA TO G_PCONTROL_ITAB.
+            "MESSAGE G_PCONTROL_WA-DELETION_INDICATOR TYPE 'I'.
+          ELSE.
+            MODIFY G_PCONTROL_ITAB FROM G_PCONTROL_WA INDEX PCONTROL-CURRENT_LINE.
+            "MESSAGE G_PCONTROL_WA-DELETION_INDICATOR TYPE 'I'.
+          endif.
+
+          MODIFY ZSCREEN_PRACTICE FROM WA_TMP.
+
+          IF sy-subrc = 0.
+            MESSAGE 'Row modified successfully' TYPE 'I'.
+          ELSE.
+            MESSAGE 'Insertion failed' TYPE 'E'.
+          ENDIF.
+
+        ELSE.
+          MESSAGE 'Material Number Not Found' TYPE 'E'.
+          gv_edit = 'T'.
+        ENDIF.
+
+        ENDIF.
+
+
+      ENDIF.
+     ENDIF.
+
+     if DITEMS_CB = ' ' and G_PCONTROL_WA-DELETION_INDICATOR = 'X'.
+        CLEAR G_PCONTROL_ITAB.
+      ENDIF.
+
+
+    WHEN 'TOGGLE'.
+
+      if G_PCONTROL_ITAB IS NOT INITIAL.
+        CASE gv_edit.
+        WHEN 'T'.
+          gv_edit = 'F'.
+         WHEN 'F'.
+           gv_edit = 'T'.
+      ENDCASE.
+     ENDIF.
+
+    WHEN 'DELETE'.
+
+      "gv_edit = 'F'.
+
+      "MESSAGE DITEMS_CB TYPE 'I'.
+
+      if DITEMS_CB = ' ' and G_PCONTROL_WA-DELETION_INDICATOR = 'X'.
+        CLEAR G_PCONTROL_ITAB.
+      ENDIF.
+
+
+  ENDCASE.
+
+
+
+ ENDMODULE.
+
+
+MODULE USER_COMMAND_0200 INPUT.
+  CASE SY-UCOMM.
+    WHEN 'OK'.
+      gv_edit = 'T'.
+      LEAVE TO SCREEN 0.
+     WHEN 'CANCEL'.
+       gv_edit = 'F'.
+       LEAVE TO SCREEN 0.
+   ENDCASE.
+
+ENDMODULE.
